@@ -879,14 +879,476 @@ function exportData() {
 }
 
 function showAdvancedTools() {
-    // Open the Performance Analysis tab which contains the advanced tools
-    const performanceTab = document.querySelector('[data-tab="performance"]');
-    if (performanceTab) {
-        performanceTab.click();
+    // Generate comprehensive data analysis
+    const analysis = generateAdvancedAnalysis();
+    
+    // Create and show analysis modal
+    showAdvancedAnalysisModal(analysis);
+}
+
+function generateAdvancedAnalysis() {
+    if (!currentScoreData || currentScoreData.length === 0) {
+        return {
+            summary: 'No data available for analysis',
+            insights: [],
+            recommendations: []
+        };
     }
     
-    // Show a helpful message about available advanced features
-    alert('✨ Advanced Analysis Tools\n\nAll advanced features are already available:\n\n📊 Performance Analysis Tab - Charts & metrics\n📈 Trend Analysis Tab - Historical trends\n🎯 Benchmarks Tab - Industry comparisons\n📤 Export to CSV - Download data\n\nClick the tabs above to access these tools!');
+    const analysis = {
+        networkSummary: analyzeNetworkPerformance(),
+        categoryInsights: analyzeCategoryPerformance(),
+        clinicInsights: analyzeIndividualClinics(),
+        trendAnalysis: analyzeTrends(),
+        recommendations: generateRecommendations(),
+        riskAssessment: assessRisks(),
+        benchmarkGaps: identifyBenchmarkGaps()
+    };
+    
+    return analysis;
+}
+
+function analyzeNetworkPerformance() {
+    const scores = currentScoreData.map(c => c.overallScore);
+    const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
+    const minScore = Math.min(...scores);
+    const maxScore = Math.max(...scores);
+    const stdDev = Math.sqrt(scores.reduce((sq, n) => sq + Math.pow(n - avgScore, 2), 0) / scores.length);
+    
+    // Performance distribution
+    const excellent = scores.filter(s => s >= 90).length;
+    const good = scores.filter(s => s >= 80 && s < 90).length;
+    const average = scores.filter(s => s >= 70 && s < 80).length;
+    const poor = scores.filter(s => s < 70).length;
+    
+    return {
+        averageScore: Math.round(avgScore * 10) / 10,
+        scoreRange: { min: minScore, max: maxScore },
+        consistency: stdDev < 5 ? 'High' : stdDev < 10 ? 'Moderate' : 'Low',
+        distribution: { excellent, good, average, poor },
+        totalClinics: currentScoreData.length
+    };
+}
+
+function analyzeCategoryPerformance() {
+    const categories = ['financial', 'operational', 'patientExperience', 'staffing'];
+    const categoryNames = {
+        financial: 'Financial Performance',
+        operational: 'Operational Efficiency',
+        patientExperience: 'Patient Experience',
+        staffing: 'Staffing & HR'
+    };
+    
+    return categories.map(category => {
+        const scores = currentScoreData.map(c => c.categoryScores[category]);
+        const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
+        const minScore = Math.min(...scores);
+        const maxScore = Math.max(...scores);
+        const topPerformer = currentScoreData.find(c => c.categoryScores[category] === maxScore);
+        const bottomPerformer = currentScoreData.find(c => c.categoryScores[category] === minScore);
+        
+        return {
+            category: categoryNames[category],
+            averageScore: Math.round(avgScore * 10) / 10,
+            range: { min: minScore, max: maxScore },
+            topPerformer: topPerformer.clinic,
+            bottomPerformer: bottomPerformer.clinic,
+            gap: Math.round((maxScore - minScore) * 10) / 10
+        };
+    });
+}
+
+function analyzeIndividualClinics() {
+    return currentScoreData.map(clinic => {
+        const strengths = [];
+        const weaknesses = [];
+        
+        // Identify strengths (scores >= 95)
+        Object.entries(clinic.categoryScores).forEach(([category, score]) => {
+            if (score >= 95) {
+                strengths.push({
+                    category: category.charAt(0).toUpperCase() + category.slice(1),
+                    score: score
+                });
+            } else if (score < 85) {
+                weaknesses.push({
+                    category: category.charAt(0).toUpperCase() + category.slice(1),
+                    score: score
+                });
+            }
+        });
+        
+        return {
+            clinic: clinic.clinic,
+            overallScore: clinic.overallScore,
+            rank: clinic.rank,
+            strengths: strengths,
+            weaknesses: weaknesses,
+            trend: clinic.trend ? clinic.trend.direction : 'stable'
+        };
+    });
+}
+
+function analyzeTrends() {
+    const improvingClinics = currentScoreData.filter(c => 
+        c.trend && (c.trend.direction === 'up' || c.trend.changePercent > 0)
+    );
+    const decliningClinics = currentScoreData.filter(c => 
+        c.trend && (c.trend.direction === 'down' || c.trend.changePercent < 0)
+    );
+    
+    return {
+        improving: improvingClinics.map(c => ({
+            clinic: c.clinic,
+            change: c.trend ? c.trend.changePercent : 0
+        })),
+        declining: decliningClinics.map(c => ({
+            clinic: c.clinic,
+            change: c.trend ? c.trend.changePercent : 0
+        })),
+        stable: currentScoreData.length - improvingClinics.length - decliningClinics.length
+    };
+}
+
+function generateRecommendations() {
+    const recommendations = [];
+    const networkSummary = analyzeNetworkPerformance();
+    const categoryInsights = analyzeCategoryPerformance();
+    
+    // Network-wide recommendations
+    if (networkSummary.averageScore < 85) {
+        recommendations.push({
+            type: 'Network-Wide',
+            priority: 'High',
+            title: 'Overall Performance Improvement Needed',
+            description: `Network average of ${networkSummary.averageScore} is below target. Focus on systematic improvements across all locations.`,
+            actions: ['Implement standardized best practices', 'Increase training frequency', 'Review operational procedures']
+        });
+    }
+    
+    // Category-specific recommendations
+    categoryInsights.forEach(category => {
+        if (category.averageScore < 80) {
+            recommendations.push({
+                type: 'Category-Specific',
+                priority: 'High',
+                title: `${category.category} Requires Attention`,
+                description: `Average score of ${category.averageScore} indicates systematic issues in ${category.category.toLowerCase()}.`,
+                actions: [`Review ${category.category.toLowerCase()} processes`, 'Benchmark against top performers', 'Implement targeted training']
+            });
+        }
+        
+        if (category.gap > 15) {
+            recommendations.push({
+                type: 'Performance Gap',
+                priority: 'Medium',
+                title: `Large Performance Gap in ${category.category}`,
+                description: `${category.gap}-point gap between ${category.topPerformer} and ${category.bottomPerformer} suggests inconsistent practices.`,
+                actions: ['Share best practices from top performers', 'Standardize procedures', 'Provide targeted support to underperformers']
+            });
+        }
+    });
+    
+    return recommendations;
+}
+
+function assessRisks() {
+    const risks = [];
+    
+    // Identify clinics with declining trends
+    const decliningClinics = currentScoreData.filter(c => 
+        c.trend && c.trend.direction === 'down'
+    );
+    
+    if (decliningClinics.length > 0) {
+        risks.push({
+            type: 'Performance Decline',
+            severity: 'Medium',
+            description: `${decliningClinics.length} clinic(s) showing declining performance`,
+            clinics: decliningClinics.map(c => c.clinic),
+            mitigation: 'Immediate performance review and intervention required'
+        });
+    }
+    
+    // Identify clinics with low scores
+    const lowPerformers = currentScoreData.filter(c => c.overallScore < 75);
+    if (lowPerformers.length > 0) {
+        risks.push({
+            type: 'Low Performance',
+            severity: 'High',
+            description: `${lowPerformers.length} clinic(s) below acceptable performance threshold`,
+            clinics: lowPerformers.map(c => c.clinic),
+            mitigation: 'Urgent intervention and support required'
+        });
+    }
+    
+    return risks;
+}
+
+function identifyBenchmarkGaps() {
+    // This would compare against industry benchmarks
+    // For now, using internal network benchmarks
+    const gaps = [];
+    const networkAvg = analyzeNetworkPerformance().averageScore;
+    
+    if (networkAvg < 90) {
+        gaps.push({
+            metric: 'Overall Performance',
+            current: networkAvg,
+            target: 90,
+            gap: 90 - networkAvg,
+            impact: 'Network-wide performance below industry standard'
+        });
+    }
+    
+    return gaps;
+}
+
+function showAdvancedAnalysisModal(analysis) {
+    const modal = document.getElementById('clinicModal');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalContent = document.getElementById('modalContent');
+    
+    modalTitle.textContent = '🔬 Advanced Data Analysis & Insights';
+    
+    let content = `
+        <div style="max-height: 70vh; overflow-y: auto; padding: 20px;">
+            <!-- Network Summary -->
+            <div style="margin-bottom: 30px; padding: 20px; background: #f8f9fa; border-radius: 8px;">
+                <h3 style="color: #2c3e50; margin-bottom: 15px;">📊 Network Performance Summary</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                    <div class="metric-item">
+                        <span class="metric-name">Network Average</span>
+                        <span class="metric-score">
+                            <span class="score-badge ${analysis.networkSummary.averageScore >= 90 ? 'score-excellent' : analysis.networkSummary.averageScore >= 80 ? 'score-good' : 'score-average'}">
+                                ${analysis.networkSummary.averageScore}
+                            </span>
+                        </span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-name">Score Range</span>
+                        <span class="metric-score">${analysis.networkSummary.scoreRange.min} - ${analysis.networkSummary.scoreRange.max}</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-name">Consistency</span>
+                        <span class="metric-score">${analysis.networkSummary.consistency}</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-name">Total Clinics</span>
+                        <span class="metric-score">${analysis.networkSummary.totalClinics}</span>
+                    </div>
+                </div>
+                <div style="margin-top: 15px;">
+                    <strong>Performance Distribution:</strong>
+                    <span style="color: #27ae60;">Excellent: ${analysis.networkSummary.distribution.excellent}</span> | 
+                    <span style="color: #f39c12;">Good: ${analysis.networkSummary.distribution.good}</span> | 
+                    <span style="color: #e67e22;">Average: ${analysis.networkSummary.distribution.average}</span> | 
+                    <span style="color: #e74c3c;">Poor: ${analysis.networkSummary.distribution.poor}</span>
+                </div>
+            </div>
+            
+            <!-- Category Performance -->
+            <div style="margin-bottom: 30px; padding: 20px; background: #f8f9fa; border-radius: 8px;">
+                <h3 style="color: #2c3e50; margin-bottom: 15px;">📈 Category Performance Analysis</h3>
+                ${analysis.categoryInsights.map(category => `
+                    <div style="margin-bottom: 15px; padding: 15px; background: white; border-radius: 5px; border-left: 4px solid #3498db;">
+                        <div style="display: flex; justify-content: between; align-items: center; margin-bottom: 10px;">
+                            <strong style="color: #2c3e50;">${category.category}</strong>
+                            <span class="score-badge ${category.averageScore >= 90 ? 'score-excellent' : category.averageScore >= 80 ? 'score-good' : 'score-average'}">
+                                ${category.averageScore}
+                            </span>
+                        </div>
+                        <div style="font-size: 14px; color: #7f8c8d;">
+                            <strong>Top:</strong> ${category.topPerformer} (${category.range.max}) | 
+                            <strong>Bottom:</strong> ${category.bottomPerformer} (${category.range.min}) | 
+                            <strong>Gap:</strong> ${category.gap} points
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+            
+            <!-- Individual Clinic Insights -->
+            <div style="margin-bottom: 30px; padding: 20px; background: #f8f9fa; border-radius: 8px;">
+                <h3 style="color: #2c3e50; margin-bottom: 15px;">🏥 Individual Clinic Analysis</h3>
+                ${analysis.clinicInsights.map(clinic => `
+                    <div style="margin-bottom: 15px; padding: 15px; background: white; border-radius: 5px;">
+                        <div style="display: flex; justify-content: between; align-items: center; margin-bottom: 10px;">
+                            <strong style="color: #2c3e50;">#${clinic.rank} ${clinic.clinic}</strong>
+                            <span class="score-badge ${clinic.overallScore >= 90 ? 'score-excellent' : clinic.overallScore >= 80 ? 'score-good' : 'score-average'}">
+                                ${clinic.overallScore}
+                            </span>
+                        </div>
+                        ${clinic.strengths.length > 0 ? `
+                            <div style="margin-bottom: 8px;">
+                                <strong style="color: #27ae60;">💪 Strengths:</strong> 
+                                ${clinic.strengths.map(s => `${s.category} (${s.score})`).join(', ')}
+                            </div>
+                        ` : ''}
+                        ${clinic.weaknesses.length > 0 ? `
+                            <div style="margin-bottom: 8px;">
+                                <strong style="color: #e74c3c;">⚠️ Areas for Improvement:</strong> 
+                                ${clinic.weaknesses.map(w => `${w.category} (${w.score})`).join(', ')}
+                            </div>
+                        ` : ''}
+                        <div style="font-size: 14px; color: #7f8c8d;">
+                            <strong>Trend:</strong> ${clinic.trend === 'up' ? '📈 Improving' : clinic.trend === 'down' ? '📉 Declining' : '➡️ Stable'}
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+            
+            <!-- Recommendations -->
+            ${analysis.recommendations.length > 0 ? `
+                <div style="margin-bottom: 30px; padding: 20px; background: #f8f9fa; border-radius: 8px;">
+                    <h3 style="color: #2c3e50; margin-bottom: 15px;">💡 Strategic Recommendations</h3>
+                    ${analysis.recommendations.map(rec => `
+                        <div style="margin-bottom: 15px; padding: 15px; background: white; border-radius: 5px; border-left: 4px solid ${rec.priority === 'High' ? '#e74c3c' : rec.priority === 'Medium' ? '#f39c12' : '#27ae60'};">
+                            <div style="display: flex; justify-content: between; align-items: center; margin-bottom: 10px;">
+                                <strong style="color: #2c3e50;">${rec.title}</strong>
+                                <span style="background: ${rec.priority === 'High' ? '#e74c3c' : rec.priority === 'Medium' ? '#f39c12' : '#27ae60'}; color: white; padding: 4px 8px; border-radius: 12px; font-size: 12px;">
+                                    ${rec.priority} Priority
+                                </span>
+                            </div>
+                            <p style="color: #7f8c8d; margin-bottom: 10px; font-size: 14px;">${rec.description}</p>
+                            <div style="font-size: 13px;">
+                                <strong>Recommended Actions:</strong>
+                                <ul style="margin: 5px 0 0 20px; color: #5a6c7d;">
+                                    ${rec.actions.map(action => `<li>${action}</li>`).join('')}
+                                </ul>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            ` : ''}
+            
+            <!-- Risk Assessment -->
+            ${analysis.riskAssessment.length > 0 ? `
+                <div style="margin-bottom: 30px; padding: 20px; background: #f8f9fa; border-radius: 8px;">
+                    <h3 style="color: #2c3e50; margin-bottom: 15px;">⚠️ Risk Assessment</h3>
+                    ${analysis.riskAssessment.map(risk => `
+                        <div style="margin-bottom: 15px; padding: 15px; background: white; border-radius: 5px; border-left: 4px solid ${risk.severity === 'High' ? '#e74c3c' : '#f39c12'};">
+                            <div style="display: flex; justify-content: between; align-items: center; margin-bottom: 10px;">
+                                <strong style="color: #2c3e50;">${risk.type}</strong>
+                                <span style="background: ${risk.severity === 'High' ? '#e74c3c' : '#f39c12'}; color: white; padding: 4px 8px; border-radius: 12px; font-size: 12px;">
+                                    ${risk.severity} Risk
+                                </span>
+                            </div>
+                            <p style="color: #7f8c8d; margin-bottom: 8px; font-size: 14px;">${risk.description}</p>
+                            ${risk.clinics ? `<p style="font-size: 13px; color: #5a6c7d;"><strong>Affected Clinics:</strong> ${risk.clinics.join(', ')}</p>` : ''}
+                            <p style="font-size: 13px; color: #e74c3c;"><strong>Mitigation:</strong> ${risk.mitigation}</p>
+                        </div>
+                    `).join('')}
+                </div>
+            ` : ''}
+            
+            <!-- Trend Analysis -->
+            <div style="margin-bottom: 30px; padding: 20px; background: #f8f9fa; border-radius: 8px;">
+                <h3 style="color: #2c3e50; margin-bottom: 15px;">📊 Trend Analysis</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                    <div style="text-align: center; padding: 15px; background: white; border-radius: 5px;">
+                        <div style="font-size: 24px; font-weight: bold; color: #27ae60;">${analysis.trendAnalysis.improving.length}</div>
+                        <div style="color: #7f8c8d;">Improving Clinics</div>
+                        ${analysis.trendAnalysis.improving.length > 0 ? `
+                            <div style="font-size: 12px; margin-top: 5px; color: #5a6c7d;">
+                                ${analysis.trendAnalysis.improving.map(c => c.clinic).join(', ')}
+                            </div>
+                        ` : ''}
+                    </div>
+                    <div style="text-align: center; padding: 15px; background: white; border-radius: 5px;">
+                        <div style="font-size: 24px; font-weight: bold; color: #e74c3c;">${analysis.trendAnalysis.declining.length}</div>
+                        <div style="color: #7f8c8d;">Declining Clinics</div>
+                        ${analysis.trendAnalysis.declining.length > 0 ? `
+                            <div style="font-size: 12px; margin-top: 5px; color: #5a6c7d;">
+                                ${analysis.trendAnalysis.declining.map(c => c.clinic).join(', ')}
+                            </div>
+                        ` : ''}
+                    </div>
+                    <div style="text-align: center; padding: 15px; background: white; border-radius: 5px;">
+                        <div style="font-size: 24px; font-weight: bold; color: #95a5a6;">${analysis.trendAnalysis.stable}</div>
+                        <div style="color: #7f8c8d;">Stable Clinics</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="text-align: center; margin-top: 20px; padding-top: 20px; border-top: 1px solid #ecf0f1;">
+                <p style="color: #7f8c8d; font-size: 14px;">Analysis generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}</p>
+                <button class="action-button" onclick="exportAnalysisReport()" style="margin-top: 10px;">📄 Export Analysis Report</button>
+            </div>
+        </div>
+    `;
+    
+    modalContent.innerHTML = content;
+    modal.style.display = 'block';
+}
+
+function exportAnalysisReport() {
+    const analysis = generateAdvancedAnalysis();
+    
+    let reportContent = `LOCATION SCORE DASHBOARD - ADVANCED ANALYSIS REPORT\n`;
+    reportContent += `Generated: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}\n\n`;
+    
+    reportContent += `NETWORK PERFORMANCE SUMMARY\n`;
+    reportContent += `============================\n`;
+    reportContent += `Network Average Score: ${analysis.networkSummary.averageScore}\n`;
+    reportContent += `Score Range: ${analysis.networkSummary.scoreRange.min} - ${analysis.networkSummary.scoreRange.max}\n`;
+    reportContent += `Consistency Level: ${analysis.networkSummary.consistency}\n`;
+    reportContent += `Total Clinics: ${analysis.networkSummary.totalClinics}\n`;
+    reportContent += `Performance Distribution: Excellent(${analysis.networkSummary.distribution.excellent}), Good(${analysis.networkSummary.distribution.good}), Average(${analysis.networkSummary.distribution.average}), Poor(${analysis.networkSummary.distribution.poor})\n\n`;
+    
+    reportContent += `CATEGORY PERFORMANCE ANALYSIS\n`;
+    reportContent += `=============================\n`;
+    analysis.categoryInsights.forEach(category => {
+        reportContent += `${category.category}: ${category.averageScore} (Range: ${category.range.min}-${category.range.max}, Gap: ${category.gap})\n`;
+        reportContent += `  Top Performer: ${category.topPerformer}\n`;
+        reportContent += `  Bottom Performer: ${category.bottomPerformer}\n\n`;
+    });
+    
+    reportContent += `INDIVIDUAL CLINIC ANALYSIS\n`;
+    reportContent += `=========================\n`;
+    analysis.clinicInsights.forEach(clinic => {
+        reportContent += `#${clinic.rank} ${clinic.clinic} (Score: ${clinic.overallScore})\n`;
+        if (clinic.strengths.length > 0) {
+            reportContent += `  Strengths: ${clinic.strengths.map(s => `${s.category}(${s.score})`).join(', ')}\n`;
+        }
+        if (clinic.weaknesses.length > 0) {
+            reportContent += `  Areas for Improvement: ${clinic.weaknesses.map(w => `${w.category}(${w.score})`).join(', ')}\n`;
+        }
+        reportContent += `  Trend: ${clinic.trend}\n\n`;
+    });
+    
+    if (analysis.recommendations.length > 0) {
+        reportContent += `STRATEGIC RECOMMENDATIONS\n`;
+        reportContent += `========================\n`;
+        analysis.recommendations.forEach((rec, index) => {
+            reportContent += `${index + 1}. ${rec.title} (${rec.priority} Priority)\n`;
+            reportContent += `   ${rec.description}\n`;
+            reportContent += `   Actions: ${rec.actions.join('; ')}\n\n`;
+        });
+    }
+    
+    if (analysis.riskAssessment.length > 0) {
+        reportContent += `RISK ASSESSMENT\n`;
+        reportContent += `===============\n`;
+        analysis.riskAssessment.forEach(risk => {
+            reportContent += `${risk.type} (${risk.severity} Risk)\n`;
+            reportContent += `  ${risk.description}\n`;
+            if (risk.clinics) {
+                reportContent += `  Affected Clinics: ${risk.clinics.join(', ')}\n`;
+            }
+            reportContent += `  Mitigation: ${risk.mitigation}\n\n`;
+        });
+    }
+    
+    const blob = new Blob([reportContent], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `advanced-analysis-report-${new Date().toISOString().split('T')[0]}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
 }
 
 function showNotification(message, type = 'info') {
