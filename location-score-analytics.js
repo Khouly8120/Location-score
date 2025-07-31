@@ -879,7 +879,39 @@ function exportData() {
 }
 
 function showAdvancedTools() {
-    alert('Advanced Analysis Tools:\n\n• Export detailed reports\n• Custom metric analysis\n• Performance forecasting\n• Benchmark comparisons\n\nThese features will be available in the next update.');
+    // Open the Performance Analysis tab which contains the advanced tools
+    const performanceTab = document.querySelector('[data-tab="performance"]');
+    if (performanceTab) {
+        performanceTab.click();
+    }
+    
+    // Show a helpful message about available advanced features
+    alert('✨ Advanced Analysis Tools\n\nAll advanced features are already available:\n\n📊 Performance Analysis Tab - Charts & metrics\n📈 Trend Analysis Tab - Historical trends\n🎯 Benchmarks Tab - Industry comparisons\n📤 Export to CSV - Download data\n\nClick the tabs above to access these tools!');
+}
+
+function showNotification(message, type = 'info') {
+    // Simple notification function
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: ${type === 'error' ? '#f44336' : '#4CAF50'};
+        color: white;
+        padding: 15px 20px;
+        border-radius: 5px;
+        z-index: 10000;
+        max-width: 300px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    `;
+    notification.textContent = message;
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.parentNode.removeChild(notification);
+        }
+    }, 5000);
 }
 
 function generateDetailedReport() {
